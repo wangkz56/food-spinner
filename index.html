@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🍽️ 吃什么转盘</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    padding: 10px;
+  }
+  .container {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  h1 { font-size: 1.15em; letter-spacing: 1px; }
+
+  .wheel-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 1;
+    overflow: visible;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #0f0f1a;
+    box-shadow: 0 0 20px rgba(233,69,96,0.25), 0 2px 12px rgba(0,0,0,0.4);
+    transition: box-shadow 0.3s;
+  }
+  canvas.spinning { box-shadow: 0 0 30px rgba(255,215,0,0.4), 0 2px 12px rgba(0,0,0,0.4); }
+
+  .result {
+    font-size: 1.3em;
+    text-align: center;
+    min-height: 1.6em;
+    line-height: 1.6em;
+    color: #ffd700;
+    font-weight: bold;
+    background: #16213e;
+    border-radius: 10px;
+    padding: 6px 24px;
+    width: 100%;
+  }
+  .result.pop { animation: popIn 0.4s ease-out; }
+  @keyframes popIn {
+    0% { transform: scale(0.5); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: 50px;
+    font-size: 0.9em;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn-spin {
+    background: linear-gradient(135deg, #e94560, #ff6b6b);
+    color: #fff;
+    font-size: 1em;
+    padding: 12px 32px;
+    box-shadow: 0 3px 12px rgba(233,69,96,0.4);
+  }
+  .btn-spin:active { transform: scale(0.95); }
+  .btn-spin:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: #16213e;
+    color: #eee;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .btn-secondary:active { background: #1e2a4a; }
+
+  .edit-section {
+    width: 100%;
+    background: #16213e;
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .edit-header h3 { font-size: 0.85em; color: #888; }
+  .edit-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 100px;
+    overflow-y: auto;
+    padding: 2px 0;
+  }
+  .edit-list::-webkit-scrollbar { width: 3px; }
+  .edit-list::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #2a2a4a;
+    border-radius: 16px;
+    font-size: 0.8em;
+  }
+  .tag .del {
+    cursor: pointer;
+    color: #ff6b6b;
+    font-size: 0.8em;
+    opacity: 0.6;
+    line-height: 1;
+    padding: 1px 3px;
+  }
+  .tag .del:active { opacity: 1; }
+  .add-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .add-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: #1a1a2e;
+    color: #eee;
+    font-size: 0.85em;
+    font-family: inherit;
+    outline: none;
+    min-width: 0;
+  }
+  .add-row input:focus { border-color: #e94560; }
+  .add-row .btn { padding: 8px 14px; font-size: 0.85em; }
+  .clear-btn {
+    background: transparent;
+    color: #888;
+    border: none;
+    font-size: 0.75em;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 12px;
+  }
+  .clear-btn:active { background: rgba(255,255,255,0.05); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🍽️ 吃什么</h1>
+
+  <div class="wheel-wrap">
+    <canvas id="wheel" width="600" height="600"></canvas>
+  </div>
+
+  <div class="result" id="result">👆 点"转"</div>
+
+  <div class="btn-row">
+    <button class="btn btn-spin" id="btnSpin" onclick="spin()">🎯 转</button>
+    <button class="btn btn-secondary" onclick="resetDefault()">🔄 重置</button>
+  </div>
+
+  <div class="edit-section">
+    <div class="edit-header">
+      <h3>✏️ 点 ✕ 删除 · 下方添加</h3>
+      <button class="clear-btn" onclick="clearAll()">清空</button>
+    </div>
+    <div class="edit-list" id="editList"></div>
+    <div class="add-row">
+      <input id="inputFood" placeholder="输入食物..." onkeydown="if(event.key==='Enter')addFood()">
+      <button class="btn btn-spin" style="padding:8px 14px;font-size:0.85em" onclick="addFood()">＋</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  const W = 600, H = 600, CX = W/2, CY = H/2, R = 290;
+
+  const COLORS = [
+    '#e94560','#f39c12','#2ecc71','#3498db','#9b59b6',
+    '#e74c3c','#1abc9c','#f1c40f','#e67e22','#00bcd4',
+    '#ff6b6b','#a29bfe','#55efc4','#fab1a0','#81ecec',
+    '#ff7675','#6c5ce7','#00cec9','#fd79a8','#636e72'
+  ];
+
+  const DEFAULT_FOODS = [
+    '麻辣烫','火锅','螺蛳粉','黄焖鸡','沙县小吃',
+    '兰州拉面','炸鸡汉堡','寿司','烤肉','麻辣香锅',
+    '煲仔饭','饺子','抄手','酸菜鱼','小龙虾','冒菜'
+  ];
+
+  let foods = [...DEFAULT_FOODS];
+  let spinning = false;
+  let currentAngle = 0;
+
+  // 自动保存
+  const SAVE_KEY = 'food_spinner_v2';
+  function saveState() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ foods, angle: currentAngle })); }
+    catch(e) {}
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.foods && Array.isArray(data.foods) && data.foods.length >= 2) {
+          foods = data.foods;
+          currentAngle = data.angle || 0;
+          return true;
+        }
+      }
+    } catch(e) {}
+    return false;
+  }
+  function afterChange() { saveState(); drawWheel(); renderEditList(); }
+
+  // 箭头画在 Canvas 内，精确固定，指向正上方（12点方向）
+  function drawPointer() {
+    ctx.save();
+    ctx.translate(CX, 18); // 在顶部
+    // 三角形箭头（向下指）
+    ctx.beginPath();
+    ctx.moveTo(0, 24);    // 顶角（最下方，指向圆心）
+    ctx.lineTo(-18, -4);  // 左上
+    ctx.lineTo(-14, -10); // 左外凸
+    ctx.lineTo(0, -4);    // 内凹顶部
+    ctx.lineTo(14, -10);  // 右外凸
+    ctx.lineTo(18, -4);   // 右上
+    ctx.closePath();
+    ctx.fillStyle = '#ffd700';
+    ctx.strokeStyle = '#b8860b';
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 画转盘：从0°（右侧3点）开始画，箭头在正上方
+  // 这样正确的扇形 = 停在正上方的那个
+  function drawWheel(highlight = -1) {
+    ctx.clearRect(0, 0, W, H);
+    const n = foods.length;
+    if (n === 0) {
+      ctx.fillStyle = '#2a2a4a';
+      ctx.beginPath(); ctx.arc(CX, CY, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#888';
+      ctx.font = 'bold 24px "PingFang SC","Microsoft YaHei"';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('添加食物~', CX, CY);
+      drawPointer();
+      return;
+    }
+    const sliceAngle = (2 * Math.PI) / n;
+    for (let i = 0; i < n; i++) {
+      const start = currentAngle + i * sliceAngle;
+      const end = start + sliceAngle;
+      ctx.beginPath();
+      ctx.moveTo(CX, CY);
+      ctx.arc(CX, CY, R, start, end);
+      ctx.closePath();
+      ctx.fillStyle = highlight === i ? '#ffd700' : COLORS[i % COLORS.length];
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(CX, CY);
+      ctx.rotate(start + sliceAngle / 2);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      const fontSize = n > 14 ? 13 : n > 10 ? 16 : n > 6 ? 20 : 24;
+      ctx.font = `bold ${fontSize}px "PingFang SC","Microsoft YaHei"`;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 3;
+      let text = foods[i];
+      if (text.length > 4) text = text.slice(0, 4) + '…';
+      ctx.fillText(text, R * 0.6, 0);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+    // 中心圆
+    const grd = ctx.createRadialGradient(CX, CY, 0, CX, CY, 24);
+    grd.addColorStop(0, '#fff');
+    grd.addColorStop(0.7, '#ddd');
+    grd.addColorStop(1, '#999');
+    ctx.beginPath();
+    ctx.arc(CX, CY, 22, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    drawPointer();
+  }
+
+  function renderEditList() {
+    document.getElementById('editList').innerHTML =
+      foods.map((f,i) => `<span class="tag">${f}<span class="del" onclick="removeFood(${i})">✕</span></span>`).join('');
+  }
+
+  function addFood() {
+    const input = document.getElementById('inputFood');
+    const val = input.value.trim();
+    if (!val) return;
+    if (foods.length >= 20) { alert('最多20个~'); return; }
+    foods.push(val);
+    input.value = '';
+    input.focus();
+    afterChange();
+  }
+
+  function removeFood(idx) {
+    if (foods.length <= 2) { alert('至少留2个'); return; }
+    foods.splice(idx, 1);
+    afterChange();
+  }
+
+  function clearAll() {
+    if (!confirm('确定清空？')) return;
+    foods = ['🍕 披萨', '🍜 拉面'];
+    afterChange();
+  }
+
+  function resetDefault() {
+    foods = [...DEFAULT_FOODS];
+    currentAngle = 0;
+    afterChange();
+    document.getElementById('result').textContent = '👆 点"转"';
+    document.getElementById('result').classList.remove('pop');
+  }
+
+  // 获取当前正上方的扇形索引
+  function getWinnerIndex() {
+    const n = foods.length;
+    if (n === 0) return -1;
+    // 正上方 = 270°（从右侧顺时针）
+    // 扇形 i 覆盖 [currentAngle_deg + i*sliceAngle, currentAngle_deg + (i+1)*sliceAngle)
+    // 找扇形 i 使得 270° 落在范围内
+    const sliceAngleDeg = 360 / n;
+    const curDeg = ((currentAngle * 180 / Math.PI) % 360 + 360) % 360;
+    // 从正上方逆时针回到扇形0的起始点
+    // 扇形0起始 = curDeg，正上方 = 270°
+    // 在扇形0坐标系中，正上方的位置 = (270 - curDeg + 360) % 360
+    const pos = (270 - curDeg + 360) % 360;
+    return Math.floor(pos / sliceAngleDeg) % n;
+  }
+
+  function spin() {
+    if (spinning || foods.length === 0) return;
+    spinning = true;
+    const btn = document.getElementById('btnSpin');
+    const resultEl = document.getElementById('result');
+    btn.disabled = true;
+    resultEl.textContent = '🎰 转呀转...';
+    canvas.classList.add('spinning');
+
+    const n = foods.length;
+    const extraSpins = 4 + Math.random() * 4;
+    const randomStop = Math.random() * 360;
+    const targetTotalDeg = extraSpins * 360 + randomStop;
+    const startAngleRad = (currentAngle * 180 / Math.PI) % 360 * (Math.PI / 180);
+
+    const duration = 2500 + Math.random() * 1500;
+    const startTime = performance.now();
+
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function animate(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = easeOutCubic(progress);
+      currentAngle = startAngleRad + targetTotalDeg * eased * (Math.PI / 180);
+      // 动态高亮当前箭头正下方的扇形（最后慢慢停下时才亮）
+      const showGlow = progress > 0.92;
+      drawWheel(showGlow ? getWinnerIndex() : -1);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        spinning = false;
+        btn.disabled = false;
+        canvas.classList.remove('spinning');
+        currentAngle = currentAngle % (Math.PI * 2);
+        drawWheel();
+        // 再确认一下结果（用getWinnerIndex做最后校验）
+        const finalWinner = getWinnerIndex();
+        resultEl.textContent = `🎉 ${foods[finalWinner]}！`;
+        resultEl.classList.add('pop');
+        setTimeout(() => resultEl.classList.remove('pop'), 600);
+        saveState();
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  // 初始化
+  if (loadState()) {
+    document.getElementById('result').textContent = '📝 已加载上次设置，共' + foods.length + '项';
+  }
+  drawWheel();
+  renderEditList();
+</script>
+</body>
+</html>
